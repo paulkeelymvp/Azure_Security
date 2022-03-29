@@ -1,0 +1,659 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "office365_Connection_Name": {
+      "type": "string",
+      "defaultValue": "office365"
+    },
+    "Environment": {
+      "type": "string"
+    },
+    "ResourceType": {
+      "type": "string",
+      "defaultValue": "https://graph.microsoft.com/"
+    },
+    "IncidentResourceType": {
+      "type": "string",
+      "defaultValue": "https://management.azure.com/"
+    },
+    "azuremonitorlogs_Connection_Name": {
+      "type": "string",
+      "defaultValue": "azuremonitorlogs-1"
+    },
+    "azuremonitorlogs_token:resourceUri": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource you are requesting authorization to use."
+      },
+      "defaultValue": "https://management.azure.com"
+    },
+    "azuremonitorlogs_token:grantType": {
+      "type": "string",
+      "metadata": {
+        "description": "Grant type"
+      },
+      "defaultValue": "client_credentials",
+      "allowedValues": [
+        "code",
+        "client_credentials"
+      ]
+    },
+    "azureloganalyticsdatacollector_Connection_Name": {
+      "type": "string",
+      "defaultValue": "azureloganalyticsdatacollector"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The unique identifier of the Azure Log Analytics workspace."
+      },
+      "defaultValue": ""
+    },
+    "logAnalyticsWorkspaceKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The primary or secondary key of the Azure Log Analytics workspace."
+      }
+    },
+    "keyvault_Connection_Name": {
+      "type": "string",
+      "defaultValue": "keyvault"
+    },
+    "KVName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the vault"
+      },
+      "defaultValue": ""
+    },
+    "KVClientId": {
+      "type": "string",
+      "metadata": {
+        "description": "Client (or Application) ID of the Azure Active Directory application."
+      },
+      "defaultValue": ""
+    },
+    "KVClientSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Client secret of the Azure Active Directory application."
+      }
+    },
+    "ManageOfficeTenantId": {
+      "type": "string",
+      "metadata": {
+        "description": "The tenant ID for the Azure Active Directory application."
+      },
+      "defaultValue": ""
+    },
+    "keyvault_token:resourceUri": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource you are requesting authorization to use, for instance https://vault.azure.net"
+      },
+      "defaultValue": "https://vault.azure.net"
+    },
+    "keyvault_token:grantType": {
+      "type": "string",
+      "metadata": {
+        "description": "Grant type"
+      },
+      "defaultValue": "client_credentials",
+      "allowedValues": [
+        "code",
+        "client_credentials"
+      ]
+    },
+    "LogicAppLocation": {
+      "type": "string",
+      "minLength": 1,
+      "allowedValues": [
+        "[resourceGroup().location]",
+        "eastasia",
+        "southeastasia",
+        "centralus",
+        "eastus",
+        "eastus2",
+        "westus",
+        "northcentralus",
+        "southcentralus",
+        "northeurope",
+        "westeurope",
+        "japanwest",
+        "japaneast",
+        "brazilsouth",
+        "australiaeast",
+        "australiasoutheast",
+        "southindia",
+        "centralindia",
+        "westindia",
+        "canadacentral",
+        "canadaeast",
+        "uksouth",
+        "ukwest",
+        "westcentralus",
+        "westus2",
+        "koreacentral",
+        "koreasouth",
+        "francecentral",
+        "francesouth",
+        "uaecentral",
+        "southafricanorth",
+        "southafricawest"
+      ],
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "LogicAppName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "SecurityAlertLogger"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "Error_Html_Body": {
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "ErrorHtmlBody",
+                    "type": "string",
+                    "value": "<!DOCTYPE html>\n<html>\n<style>\n\t.notification-table-header {\n\t\twidth: auto;\n\t\tborder-top: none;\n\t\tbackground: #4D98A8;\n\t\tfont-size: 11.0pt;\n\t\tcolor: white;\n\t\tfont-weight: bold;\n\t\tmargin-left: 10px;\n\t\ttext-align: left;\n\t\tborder: none;\n\t\tborder-bottom: solid white 1.5pt;\n\t}\n\n\t.notification-table-text {\n\t\tmargin-left: 5px;\n\t\twidth: 70%;\n\t\ttext-align: left;\n\t\tborder: none;\n\t\tborder-bottom: solid white 1.5pt;\n\t\tbackground: #F2F2F2;\n\t\tfont-size: 12.0pt;\n\t\theight: 20.05pt;\n\t}\n\n\t.notification-card-footer span {\n\t\tfont-size: 12.0pt;\n\t\tcolor: #7F7F7F;\n\t}\n\n\t.notification-card-footer p {\n\t\tvertical-align: baseline;\n\t}\n\n\t.notification-body {\n\t\tmargin: 0 auto;\n\t\ttext-align: center;\n\t\twidth: 650px;\n\t\tborder: 1px black;\n\t\tborder-collapse: collapse;\n\t\tbackground-color: #C5DFE5;\n\t}\n</style>\n\n<body style=\"background-color: #dfdfdf;\">\n\t<table style=\"width:100%;\">\n\t<tr>\n\t<td style=\"padding:0;\">\n\t<div align=\"center\">\n\t<table class=\"notification-body\">\n\t<tr style=\"border: 1px grey; border-top:none;\">\n\t<td>\n\t<p style='font-size:5.0pt;'><span>&nbsp;</span></p>\n\t<table style='width:590px;margin:0 auto;border-collapse:collapse;'>\n\t<tr style='height:20.05pt'>\n\t<td colspan=\"2\" class=\"notification-table-header\"\t\t\t\t\t\t\t\t\t\t    style='width:100%; height:20.05pt'>\n\t<p style='text-align:center; font-size:16.0pt;'>\n       <b>Logic app failure</b><br/>&nbsp;</p>\n\t</td>\n\t</tr>\n\t<tr class=\"notification-card-footer\">\n\t<td colspan=\"2\">\n\t</br></br>\n\t<p style='text-align:left;'><b>This is Critical error notification : Unable to access/find values in Keyvault</b></p>\n\t<p style='text-align:left;'>More details here: </p>\n\t</td>\n\t</tr>\t\t\t\t\t\t\t\t\t\n\t<tr>\n\t<td class=\"notification-table-header\">\n\t<span>&nbsp; App:</span>\n\t</td>\n\t<td class=\"notification-table-text\">@{parameters('logicAppName')}</td>\n\t</tr> \n\t<tr>\n\t<td class=\"notification-table-header\">\n\t<span>&nbsp; Environment:</span>\n\t</td>\n\t<td class=\"notification-table-text\">@{parameters('Environment')}</td>\n\t</tr>\n\t<tr class=\"notification-card-footer\">\n\t<td colspan=\"2\">\n\t<p style='text-indent:36.0pt;'>\n\t<span style='font-size:0.0pt;'>&nbsp;</span>\n\t</p>\n\t<p style='text-align:center;'>\n\t<b>\n\t<span style='font-size:16.0pt;'>Born in the Cloud</span>\n\t</b>\n\t</p>\n\t<p style='text-align:center;'>\n\t<span>Contact admin/devs for more about this notification\n\t\n\t</span>\n\t<br/>&nbsp;\n\t</p>\n\t</td>\n\t</tr>\n\t</table>\n\t</td>\n\t</tr>\n\t</table>\n\t</div>\n\t</td>\n\t</tr>\n\t</table>\n</body>\n</html>"
+                  }
+                ]
+              },
+              "runAfter": {
+                "Owner_mail": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Global_Scope": {
+              "type": "Scope",
+              "actions": {
+                "Fetch_Secrets_of_a_client": {
+                  "type": "Scope",
+                  "actions": {
+                    "Get_ClientId": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['keyvault']['connectionId']"
+                          }
+                        },
+                        "method": "get",
+                        "path": "/secrets/@{encodeURIComponent('ManageOfficeClientId')}/value",
+                        "retryPolicy": {
+                          "type": "exponential",
+                          "count": 90,
+                          "interval": "PT20S",
+                          "minimumInterval": "PT10S",
+                          "maximumInterval": "PT1H"
+                        }
+                      },
+                      "runAfter": {
+                        "Get_Client_secret": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Client_secret": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['keyvault']['connectionId']"
+                          }
+                        },
+                        "method": "get",
+                        "path": "/secrets/@{encodeURIComponent('ManageOfficeClientSecret')}/value",
+                        "retryPolicy": {
+                          "type": "exponential",
+                          "count": 90,
+                          "interval": "PT20S",
+                          "minimumInterval": "PT10S",
+                          "maximumInterval": "PT1H"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Get_Loganalytics_workspace": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['keyvault']['connectionId']"
+                          }
+                        },
+                        "method": "get",
+                        "path": "/secrets/@{encodeURIComponent('SentinelLogAnalyticsWorkspaceName')}/value",
+                        "retryPolicy": {
+                          "type": "exponential",
+                          "count": 90,
+                          "interval": "PT20S",
+                          "minimumInterval": "PT10S",
+                          "maximumInterval": "PT1H"
+                        }
+                      },
+                      "runAfter": {
+                        "Get_tenantId": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Sentinel_Resource_group": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['keyvault']['connectionId']"
+                          }
+                        },
+                        "method": "get",
+                        "path": "/secrets/@{encodeURIComponent('SentinelResourceGroup')}/value",
+                        "retryPolicy": {
+                          "type": "exponential",
+                          "count": 90,
+                          "interval": "PT20S",
+                          "minimumInterval": "PT10S",
+                          "maximumInterval": "PT1H"
+                        }
+                      },
+                      "runAfter": {
+                        "Get_Loganalytics_workspace": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_tenantId": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['keyvault']['connectionId']"
+                          }
+                        },
+                        "method": "get",
+                        "path": "/secrets/@{encodeURIComponent('ManageOfficeTenantId')}/value",
+                        "retryPolicy": {
+                          "type": "exponential",
+                          "count": 90,
+                          "interval": "PT20S",
+                          "minimumInterval": "PT10S",
+                          "maximumInterval": "PT1H"
+                        }
+                      },
+                      "runAfter": {
+                        "Get_ClientId": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Get_and_Log_alerts": {
+                  "type": "Scope",
+                  "actions": {
+                    "For_each_query_result": {
+                      "type": "Foreach",
+                      "foreach": "@body('Run_query_and_list_results_for_last_updated_time')?['value']",
+                      "actions": {
+                        "Set_Graph_API_URL": {
+                          "type": "SetVariable",
+                          "inputs": {
+                            "name": "GraphAPIURL",
+                            "value": "https://graph.microsoft.com/beta/security/alerts?$filter=lastModifiedDateTime gt @{items('For_each_query_result')?['lastModifiedDateTime_t']} and vendorInformation/provider eq 'Office 365 Security and Compliance' and category eq 'ThreatManagement'"
+                          },
+                          "runAfter": {}
+                        },
+                        "Until_NextLink": {
+                          "type": "Until",
+                          "expression": "@equals(variables('GraphAPIURL'), '')",
+                          "limit": {
+                            "count": 1000,
+                            "timeout": "PT2H"
+                          },
+                          "actions": {
+                            "Compose_Alerts": {
+                              "type": "Compose",
+                              "inputs": "@body('Get_alerts_from_Security_Graph')?['value']",
+                              "runAfter": {
+                                "Get_alerts_from_Security_Graph": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "For_each_Alert": {
+                              "type": "Foreach",
+                              "foreach": "@body('Get_alerts_from_Security_Graph')?['value']",
+                              "actions": {
+                                "Compose_Alert": {
+                                  "type": "Compose",
+                                  "inputs": "@items('For_each_Alert')",
+                                  "runAfter": {}
+                                },
+                                "Send_Alert_Data_to_LA": {
+                                  "type": "ApiConnection",
+                                  "inputs": {
+                                    "host": {
+                                      "connection": {
+                                        "name": "@parameters('$connections')['azureloganalyticsdatacollector']['connectionId']"
+                                      }
+                                    },
+                                    "method": "post",
+                                    "body": "@{items('For_each_Alert')}",
+                                    "headers": {
+                                      "Log-Type": "O365Alerts"
+                                    },
+                                    "path": "/api/logs"
+                                  },
+                                  "runAfter": {
+                                    "Compose_Alert": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                }
+                              },
+                              "runAfter": {
+                                "Compose_Alerts": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Get_alerts_from_Security_Graph": {
+                              "type": "Http",
+                              "inputs": {
+                                "method": "GET",
+                                "uri": "@variables('GraphAPIURL')",
+                                "authentication": {
+                                  "audience": "https://graph.microsoft.com",
+                                  "clientId": "@body('Get_ClientId')?['value']",
+                                  "secret": "@body('Get_Client_secret')?['value']",
+                                  "tenant": "@body('Get_tenantId')?['value']",
+                                  "type": "ActiveDirectoryOAuth"
+                                }
+                              },
+                              "runAfter": {}
+                            },
+                            "Parse_Next_Link": {
+                              "type": "ParseJson",
+                              "inputs": {
+                                "content": "@body('Get_alerts_from_Security_Graph')",
+                                "schema": {
+                                  "properties": {
+                                    "@@odata.context": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "@@odata.nextLink": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    }
+                                  },
+                                  "type": "object"
+                                }
+                              },
+                              "runAfter": {
+                                "For_each_Alert": [
+                                  "Succeeded"
+                                ]
+                              }
+                            },
+                            "Set_Graph_API_Next_Link": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "GraphAPIURL",
+                                "value": "@{body('Parse_Next_Link')?['@odata.nextLink']}"
+                              },
+                              "runAfter": {
+                                "Parse_Next_Link": [
+                                  "Succeeded"
+                                ]
+                              }
+                            }
+                          },
+                          "runAfter": {
+                            "Set_Graph_API_URL": [
+                              "Succeeded"
+                            ]
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Run_query_and_list_results_for_last_updated_time": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Run_query_and_list_results_for_last_updated_time": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azuremonitorlogs']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "body": "let oldDateTime = view () { print lastModifiedDateTime_t=datetime(\"1900-01-01 00:00:00\") };\nunion isfuzzy=true\n(oldDateTime),\n(O365Alerts_CL |  summarize arg_max(lastModifiedDateTime_t , lastModifiedDateTime_t )  | project lastModifiedDateTime_t )\n| summarize arg_max(lastModifiedDateTime_t , lastModifiedDateTime_t )\n| project lastModifiedDateTime_t   ",
+                        "path": "/queryData",
+                        "queries": {
+                          "subscriptions": "[string(subscription().subscriptionId)]",
+                          "resourcegroups": "@body('Get_Sentinel_Resource_group')?['value']",
+                          "resourcetype": "Log Analytics Workspace",
+                          "resourcename": "@body('Get_Loganalytics_workspace')?['value']",
+                          "timerange": "Last 24 hours"
+                        }
+                      },
+                      "runAfter": {}
+                    }
+                  },
+                  "runAfter": {
+                    "Set_Error_html_body": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Set_Error_html_body": {
+                  "type": "SetVariable",
+                  "inputs": {
+                    "name": "ErrorHtmlBody",
+                    "value": "<!DOCTYPE html>\n<html>\n<style>\n\t.notification-table-header {\n\t\twidth: auto;\n\t\tborder-top: none;\n\t\tbackground: #4D98A8;\n\t\tfont-size: 11.0pt;\n\t\tcolor: white;\n\t\tfont-weight: bold;\n\t\tmargin-left: 10px;\n\t\ttext-align: left;\n\t\tborder: none;\n\t\tborder-bottom: solid white 1.5pt;\n\t}\n\n\t.notification-table-text {\n\t\tmargin-left: 5px;\n\t\twidth: 70%;\n\t\ttext-align: left;\n\t\tborder: none;\n\t\tborder-bottom: solid white 1.5pt;\n\t\tbackground: #F2F2F2;\n\t\tfont-size: 12.0pt;\n\t\theight: 20.05pt;\n\t}\n\n\t.notification-card-footer span {\n\t\tfont-size: 12.0pt;\n\t\tcolor: #7F7F7F;\n\t}\n\n\t.notification-card-footer p {\n\t\tvertical-align: baseline;\n\t}\n\n\t.notification-body {\n\t\tmargin: 0 auto;\n\t\ttext-align: center;\n\t\twidth: 650px;\n\t\tborder: 1px black;\n\t\tborder-collapse: collapse;\n\t\tbackground-color: #C5DFE5;\n\t}\n</style>\n\n<body style=\"background-color: #dfdfdf;\">\n\t<table style=\"width:100%;\">\n\t<tr>\n\t<td style=\"padding:0;\">\n\t<div align=\"center\">\n\t<table class=\"notification-body\">\n\t<tr style=\"border: 1px grey; border-top:none;\">\n\t<td>\n\t<p style='font-size:5.0pt;'><span>&nbsp;</span></p>\n\t<table style='width:590px;margin:0 auto;border-collapse:collapse;'>\n\t<tr style='height:20.05pt'>\n\t<td colspan=\"2\" class=\"notification-table-header\"\t\t\t\t\t\t\t\t\t\t    style='width:100%; height:20.05pt'>\n\t<p style='text-align:center; font-size:16.0pt;'>\n       <b>Logic app failure</b><br/>&nbsp;</p>\n\t</td>\n\t</tr>\n\t<tr class=\"notification-card-footer\">\n\t<td colspan=\"2\">\n\t</br></br>\n\t<p style='text-align:left;'><b>This is Critical error notification : Unexpected Run failure</b></p>\n\t<p style='text-align:left;'>More details here: </p>\n\t</td>\n\t</tr>\t\t\t\t\t\t\t\t\t\n\t<tr>\n\t<td class=\"notification-table-header\">\n\t<span>&nbsp; App:</span>\n\t</td>\n\t<td class=\"notification-table-text\">@{parameters('logicAppName')}</td>\n\t</tr> \n\t<tr>\n\t<td class=\"notification-table-header\">\n\t<span>&nbsp; Environment:</span>\n\t</td>\n\t<td class=\"notification-table-text\">@{parameters('Environment')}</td>\n\t</tr>\n\t<tr class=\"notification-card-footer\">\n\t<td colspan=\"2\">\n\t<p style='text-indent:36.0pt;'>\n\t<span style='font-size:0.0pt;'>&nbsp;</span>\n\t</p>\n\t<p style='text-align:center;'>\n\t<b>\n\t<span style='font-size:16.0pt;'>Born in the Cloud</span>\n\t</b>\n\t</p>\n\t<p style='text-align:center;'>\n\t<span>Contact admin/devs for more about this notification\n\t\n\t</span>\n\t<br/>&nbsp;\n\t</p>\n\t</td>\n\t</tr>\n\t</table>\n\t</td>\n\t</tr>\n\t</table>\n\t</div>\n\t</td>\n\t</tr>\n\t</table>\n</body>\n</html>"
+                  },
+                  "runAfter": {
+                    "Fetch_Secrets_of_a_client": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {
+                "Error_Html_Body": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Graph_API_URL": {
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "GraphAPIURL",
+                    "type": "String"
+                  }
+                ]
+              },
+              "runAfter": {}
+            },
+            "Owner_mail": {
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "Owner mail",
+                    "type": "String"
+                  }
+                ]
+              },
+              "runAfter": {
+                "Graph_API_URL": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            },
+            "Environment": {
+              "type": "String"
+            },
+            "IncidentResourceType": {
+              "type": "String"
+            },
+            "ResourceType": {
+              "type": "String"
+            },
+            "logicAppName": {
+              "type": "String"
+            }
+          },
+          "triggers": {
+            "Recurrence": {
+              "type": "Recurrence",
+              "recurrence": {
+                "frequency": "Minute",
+                "interval": 5
+              }
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "keyvault": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'keyvault')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('keyvault_Connection_Name'))]",
+                "connectionName": "[parameters('keyvault_Connection_Name')]"
+              },
+              "azureloganalyticsdatacollector": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'azureloganalyticsdatacollector')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('azureloganalyticsdatacollector_Connection_Name'))]",
+                "connectionName": "[parameters('azureloganalyticsdatacollector_Connection_Name')]"
+              },
+              "azuremonitorlogs": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'azuremonitorlogs')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('azuremonitorlogs_Connection_Name'))]",
+                "connectionName": "[parameters('azuremonitorlogs_Connection_Name')]"
+              }
+            }
+          },
+          "Environment": {
+            "value": "[parameters('Environment')]"
+          },
+          "IncidentResourceType": {
+            "value": "[parameters('IncidentResourceType')]"
+          },
+          "ResourceType": {
+            "value": "[parameters('ResourceType')]"
+          },
+          "logicAppName": {
+            "value": "[parameters('logicAppName')]"
+          }
+        }
+      },
+      "name": "[parameters('LogicAppName')]",
+      "type": "Microsoft.Logic/workflows",
+      "location": "[parameters('LogicAppLocation')]",
+      "tags": {
+        "displayName": "LogicApp"
+      },
+      "apiVersion": "2016-06-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('keyvault_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('azureloganalyticsdatacollector_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('azuremonitorlogs_Connection_Name'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('office365_Connection_Name')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'office365')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('azuremonitorlogs_Connection_Name')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'azuremonitorlogs')]"
+        },
+        "parameterValues": {
+          "token:clientId": "[parameters('KVClientId')]",
+          "token:clientSecret": "[parameters('KVClientSecret')]",
+          "token:TenantId": "[parameters('ManageOfficeTenantId')]",
+          "token:resourceUri": "[parameters('azuremonitorlogs_token:resourceUri')]",
+          "token:grantType": "[parameters('azuremonitorlogs_token:grantType')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('azureloganalyticsdatacollector_Connection_Name')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'azureloganalyticsdatacollector')]"
+        },
+        "parameterValues": {
+          "username": "[parameters('logAnalyticsWorkspaceId')]",
+          "password": "[parameters('logAnalyticsWorkspaceKey')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('keyvault_Connection_Name')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'keyvault')]"
+        },
+        "parameterValues": {
+          "vaultName": "[parameters('KVName')]",
+          "token:clientId": "[parameters('KVClientId')]",
+          "token:clientSecret": "[parameters('KVClientSecret')]",
+          "token:TenantId": "[parameters('ManageOfficeTenantId')]",
+          "token:resourceUri": "[parameters('keyvault_token:resourceUri')]",
+          "token:grantType": "[parameters('keyvault_token:grantType')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}

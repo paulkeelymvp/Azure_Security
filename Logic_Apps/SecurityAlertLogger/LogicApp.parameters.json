@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "value": "SecurityAlertLogger-{client}"
+    },
+    "KVName": {
+      "metadata": {
+        "description": "Name of KeyVault."
+      },
+      "value": ""
+    },
+    "KVClientId": {
+      "metadata": {
+        "description": "ManageOffice ClientId."
+      },
+      "value": ""
+    },
+    "KVClientSecret": {
+      "metadata": {
+        "description": "ManageOffice Client Secret."
+      },
+      "value": ""
+    },
+    "ManageOfficeTenantId": {
+      "metadata": {
+        "description": "ManageOffice TenantId."
+      },
+      "value": ""
+    },
+    "logAnalyticsWorkspaceId": {
+      "metadata": {
+        "description": "logAnalyticsWorkspace Id."
+      },
+      "value": ""
+    },
+    "logAnalyticsWorkspaceKey": {
+      "metadata": {
+        "description": "logAnalyticsWorkspace Key."
+      },
+      "value": ""
+    },
+    "Environment": {
+      "value": ""
+    }
+  },
+  "RGName": { "value": "" },
+  "SubscriptionId": { "value": "" }
+}
