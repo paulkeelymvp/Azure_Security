@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicappName": {
+      "value": "DeviceNetworkEvents-MDATP-Mosaic"
+    },
+    "ClientId": {
+      "value": ""
+    },
+    "ManageOfficeTenantId": {
+      "value": ""
+    },
+    "ClientSecret": {
+      "value": ""
+    },
+    "logAnalyticsWorkspaceId": {
+      "metadata": {
+        "description": "logAnalyticsWorkspace Id."
+      },
+      "value": ""
+    },
+    "logAnalyticsWorkspaceKey": {
+      "metadata": {
+        "description": "logAnalyticsWorkspace Key."
+      },
+      "value": ""
+    }
+  },
+  "RGName": { "value": "" },
+  "SubscriptionId": { "value": "" }
+}
