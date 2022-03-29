@@ -1,0 +1,479 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "LogAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The unique identifier of the Azure Log Analytics workspace."
+      },
+      "defaultValue": ""
+    },
+    "LogAnalyticsWorkspaceKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The primary or secondary key of the Azure Log Analytics workspace."
+      }
+    },
+    "azureloganalyticsdatacollector_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "AutoResponseLAConnection"
+    },
+    "azureloganalyticsdatacollector_Connection_Name": {
+      "type": "string",
+      "defaultValue": "azureloganalyticsdatacollector"
+    },
+    "azuresentinel_Connection_Name": {
+      "type": "string",
+      "defaultValue": "AzureSentinelConnection"
+    },
+    "azuresentinel_token:grantType": {
+      "type": "string",
+      "metadata": {
+        "description": "Grant type"
+      },
+      "defaultValue": "client_credentials",
+      "allowedValues": [
+        "code",
+        "client_credentials"
+      ]
+    },
+    "keyvault_Connection_Name": {
+      "type": "string",
+      "defaultValue": "keyvault"
+    },
+    "keyvault_token:grantType": {
+      "type": "string",
+      "metadata": {
+        "description": "Grant type"
+      },
+      "defaultValue": "client_credentials",
+      "allowedValues": [
+        "code",
+        "client_credentials"
+      ]
+    },
+    "KVClientId": {
+      "type": "string",
+      "metadata": {
+        "description": "Client (or Application) ID of the Azure Active Directory application."
+      },
+      "defaultValue": ""
+    },
+    "KVClientSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Client secret of the Azure Active Directory application."
+      }
+    },
+    "KVName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the vault"
+      },
+      "defaultValue": "mosaic-kv"
+    },
+    "LogicAppLocation": {
+      "type": "string",
+      "minLength": 1,
+      "allowedValues": [
+        "[resourceGroup().location]",
+        "eastasia",
+        "southeastasia",
+        "centralus",
+        "eastus",
+        "eastus2",
+        "westus",
+        "northcentralus",
+        "southcentralus",
+        "northeurope",
+        "westeurope",
+        "japanwest",
+        "japaneast",
+        "brazilsouth",
+        "australiaeast",
+        "australiasoutheast",
+        "southindia",
+        "centralindia",
+        "westindia",
+        "canadacentral",
+        "canadaeast",
+        "uksouth",
+        "ukwest",
+        "westcentralus",
+        "westus2",
+        "koreacentral",
+        "koreasouth",
+        "francecentral",
+        "francesouth",
+        "uaecentral",
+        "southafricanorth",
+        "southafricawest"
+      ],
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "LogicAppName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "GetMailAutoResponse-Mosaic"
+    },
+    "ManageOfficeTenantId": {
+      "type": "string",
+      "defaultValue": "tenant"
+    },
+    "ResourceTags": {
+      "type": "object",
+      "defaultValue": {
+        "Application_Group": "Security",
+        "Backup_By": "N/A",
+        "Environment": "Production",
+        "OS_Management": "N/A",
+        "Owner": "Mosaic"
+      }
+    }
+  },
+  "variables": {
+    "OfficeGraphResourceURI": "https://graph.microsoft.com/",
+    "AzuresentinelResourceURI": "https://management.azure.com/",
+    "KeyVaultResourceURI": "https://vault.azure.net"
+  },
+  "resources": [
+    {
+      "name": "[parameters('LogicAppName')]",
+      "type": "Microsoft.Logic/workflows",
+      "location": "[parameters('LogicAppLocation')]",
+      "tags": "[parameters('resourceTags')]",
+      "apiVersion": "2016-06-01",
+      "properties": {
+        "state": "Disabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "Global_Scope": {
+              "type": "Scope",
+              "actions": {
+                "Alert_-_Get_accounts": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "body": "@triggerBody()?['Entities']",
+                    "path": "/entities/account"
+                  },
+                  "runAfter": {
+                    "Get_ManageOfficeClientSecret": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "For_each_Account_Entities": {
+                  "type": "Foreach",
+                  "foreach": "@body('Alert_-_Get_accounts')?['Accounts']",
+                  "actions": {
+                    "Compose_to_Add_UPN": {
+                      "type": "Compose",
+                      "inputs": "@setProperty(body('Parse_AutoResponse'),'UserPrincipalName',concat(items('For_each_Account_Entities')?['Name'],'@',items('For_each_Account_Entities')?['UPNSuffix']))",
+                      "runAfter": {
+                        "Parse_AutoResponse": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_AutoResponse": {
+                      "type": "Http",
+                      "inputs": {
+                        "method": "GET",
+                        "uri": "@{concat('https://graph.microsoft.com/','v1.0/users/',items('For_each_Account_Entities')?['Name'],'@',items('For_each_Account_Entities')?['UPNSuffix'],'/mailboxsettings')}",
+                        "authentication": {
+                          "audience": "[variables('OfficeGraphResourceURI')]",
+                          "clientId": "@body('Get_ManageOfficeClientId')?['value']",
+                          "secret": "@body('Get_ManageOfficeClientSecret')?['value']",
+                          "tenant": "[parameters('ManageOfficeTenantId')]",
+                          "type": "ActiveDirectoryOAuth"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Parse_AutoResponse": {
+                      "type": "ParseJson",
+                      "inputs": {
+                        "content": "@body('Get_AutoResponse')",
+                        "schema": {
+                          "properties": {
+                            "archiveFolder": {
+                              "type": [ "string", "null" ]
+                            },
+                            "automaticRepliesSetting": {
+                              "properties": {
+                                "externalAudience": {
+                                  "type": [ "string", "null" ]
+                                },
+                                "externalReplyMessage": {
+                                  "type": [ "string", "null" ]
+                                },
+                                "internalReplyMessage": {
+                                  "type": [ "string", "null" ]
+                                },
+                                "scheduledEndDateTime": {
+                                  "properties": {
+                                    "dateTime": {
+                                      "type": [ "string", "null" ]
+                                    },
+                                    "timeZone": {
+                                      "type": [ "string", "null" ]
+                                    }
+                                  },
+                                  "type": [ "object", "null" ]
+                                },
+                                "scheduledStartDateTime": {
+                                  "properties": {
+                                    "dateTime": {
+                                      "type": [ "string", "null" ]
+                                    },
+                                    "timeZone": {
+                                      "type": [ "string", "null" ]
+                                    }
+                                  },
+                                  "type": [ "object", "null" ]
+                                },
+                                "status": {
+                                  "type": [ "string", "null" ]
+                                }
+                              },
+                              "type": [ "object", "null" ]
+                            },
+                            "dateFormat": {
+                              "type": [ "string", "null" ]
+                            },
+                            "delegateMeetingMessageDeliveryOptions": {
+                              "type": [ "string", "null" ]
+                            },
+                            "language": {
+                              "properties": {
+                                "displayName": {
+                                  "type": [ "string", "null" ]
+                                },
+                                "locale": {
+                                  "type": [ "string", "null" ]
+                                }
+                              },
+                              "type": [ "object", "null" ]
+                            },
+                            "timeFormat": {
+                              "type": [ "string", "null" ]
+                            },
+                            "timeZone": {
+                              "type": [ "string", "null" ]
+                            },
+                            "workingHours": {
+                              "properties": {
+                                "daysOfWeek": {
+                                  "items": {
+                                    "type": [ "string", "null" ]
+                                  },
+                                  "type": [ "array", "null" ]
+                                },
+                                "endTime": {
+                                  "type": [ "string", "null" ]
+                                },
+                                "startTime": {
+                                  "type": [ "string", "null" ]
+                                },
+                                "timeZone": {
+                                  "properties": {
+                                    "name": {
+                                      "type": [ "string", "null" ]
+                                    }
+                                  },
+                                  "type": [ "object", "null" ]
+                                }
+                              },
+                              "type": [ "object", "null" ]
+                            }
+                          },
+                          "type": [ "object", "null" ]
+                        }
+                      },
+                      "runAfter": {
+                        "Get_AutoResponse": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Send_Data": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azureloganalyticsdatacollector']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "body": "@{outputs('Compose_to_Add_UPN')}",
+                        "headers": {
+                          "Log-Type": "OutlookAutoResponse"
+                        },
+                        "path": "/api/logs"
+                      },
+                      "runAfter": {
+                        "Compose_to_Add_UPN": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Alert_-_Get_accounts": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Get_ManageOfficeClientId": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['keyvault']['connectionId']"
+                      }
+                    },
+                    "method": "get",
+                    "path": "/secrets/@{encodeURIComponent('ManageOfficeClientId')}/value"
+                  },
+                  "runAfter": {}
+                },
+                "Get_ManageOfficeClientSecret": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['keyvault']['connectionId']"
+                      }
+                    },
+                    "method": "get",
+                    "path": "/secrets/@{encodeURIComponent('ManageOfficeClientSecret')}/value"
+                  },
+                  "runAfter": {
+                    "Get_ManageOfficeClientId": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_response_to_an_Azure_Sentinel_alert_is_triggered": {
+              "type": "ApiConnectionWebhook",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                  }
+                },
+                "body": {
+                  "callback_url": "@{listCallbackUrl()}"
+                },
+                "path": "/subscribe"
+              }
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "azuresentinel": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'azuresentinel')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('azuresentinel_Connection_Name'))]",
+                "connectionName": "[parameters('azuresentinel_Connection_Name')]"
+              },
+              "azureloganalyticsdatacollector": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'azureloganalyticsdatacollector')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('azureloganalyticsdatacollector_Connection_Name'))]",
+                "connectionName": "[parameters('azureloganalyticsdatacollector_Connection_Name')]"
+              },
+              "keyvault": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'keyvault')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('keyvault_Connection_Name'))]",
+                "connectionName": "[parameters('keyvault_Connection_Name')]"
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('azuresentinel_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('azureloganalyticsdatacollector_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('keyvault_Connection_Name'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('azuresentinel_Connection_Name')]",
+      "tags": "[parameters('resourceTags')]",
+      "location": "[parameters('logicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'azuresentinel')]"
+        },
+        "parameterValues": {
+          "token:clientId": "[parameters('KVClientId')]",
+          "token:clientSecret": "[parameters('KVClientSecret')]",
+          "token:TenantId": "[parameters('ManageOfficeTenantId')]",
+          "token:resourceUri": "[variables('AzuresentinelResourceURI')]",
+          "token:grantType": "[parameters('azuresentinel_token:grantType')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('azureloganalyticsdatacollector_Connection_Name')]",
+      "location": "[parameters('logicAppLocation')]",
+      "tags": "[parameters('resourceTags')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'azureloganalyticsdatacollector')]"
+        },
+        "parameterValues": {
+          "username": "[parameters('LogAnalyticsWorkspaceId')]",
+          "password": "[parameters('LogAnalyticsWorkspaceKey')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('keyvault_Connection_Name')]",
+      "location": "[parameters('logicAppLocation')]",
+      "tags": "[parameters('resourceTags')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('logicAppLocation'), '/managedApis/', 'keyvault')]"
+        },
+        "parameterValues": {
+          "vaultName": "[parameters('KVName')]",
+          "token:clientId": "[parameters('KVClientId')]",
+          "token:clientSecret": "[parameters('KVClientSecret')]",
+          "token:TenantId": "[parameters('ManageOfficeTenantId')]",
+          "token:resourceUri": "[variables('KeyVaultResourceURI')]",
+          "token:grantType": "[parameters('keyvault_token:grantType')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
